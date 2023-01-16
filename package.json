@@ -4,7 +4,8 @@
   "description": "URL Shortner",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node src/index.js"
   },
   "repository": {
     "type": "git",
@@ -18,6 +19,8 @@
   "homepage": "https://github.com/Tapaswee2001Samantaray/Flexible-Shorten-URL#readme",
   "dependencies": {
     "express": "^4.18.2",
-    "mongoose": "^6.8.3"
+    "mongoose": "^6.8.3",
+    "shortid": "^2.2.16",
+    "valid-url": "^1.0.9"
   }
 }
