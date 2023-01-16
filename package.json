@@ -1,0 +1,23 @@
+{
+  "name": "src",
+  "version": "1.0.0",
+  "description": "URL Shortner",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Tapaswee2001Samantaray/Flexible-Shorten-URL.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Tapaswee2001Samantaray/Flexible-Shorten-URL/issues"
+  },
+  "homepage": "https://github.com/Tapaswee2001Samantaray/Flexible-Shorten-URL#readme",
+  "dependencies": {
+    "express": "^4.18.2",
+    "mongoose": "^6.8.3"
+  }
+}
