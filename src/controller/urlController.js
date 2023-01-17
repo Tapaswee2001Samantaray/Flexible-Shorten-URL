@@ -53,10 +53,15 @@ const getUrl = async function (req, res) {
     try {
         let data = req.params;
         let urlCode = data.urlCode;
-        
+
         //=====validation for URL code=======
         if (!urlCode) {
             return res.status(400).send({ status: false, message: "URL Code is required." });
+        }
+
+        //====checking the URL code is valid or not=====
+        if (!ShortId.isValid(urlCode)) {
+            return res.status(400).send({ status: false, message: "Please enter a valid URL code." });
         }
 
         //======fetch the details based on the URL code======
@@ -67,7 +72,7 @@ const getUrl = async function (req, res) {
 
         //=====redirecting to the Long URL based on the URL code=====
         res.status(302).redirect(checkUrlCode.longUrl);
-        
+
     } catch (err) {
         return res.status(500).send({ status: false, message: err.message });
     }
