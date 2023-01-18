@@ -1,6 +1,9 @@
 const checkValidUrl = require("valid-url");
 const ShortId = require("shortid");
+const axios = require("axios");
+
 const urlModel = require("../model/urlModel");
+const caching = require("../cache/caching");
 
 
 //==============router handler for short url===============
@@ -19,12 +22,27 @@ const createShortUrl = async function (req, res) {
         }
 
         if (!checkValidUrl.isWebUri(longUrl.trim())) {
-            return res.status(400).send({ status: false, message: "Please Enter a valid URL." });
+            return res.status(400).send({ status: false, message: "Please Enter a valid URL syntax." });
+        }
+
+        let checkUrl = await axios.get(longUrl) //this will work only on Public URL not private URL
+            .then(() => longUrl)
+            .catch(() => null)
+
+        if (!checkUrl) {
+            return res.status(400).send({ status: false, message: "Please enter a valid URL." });
         }
 
         //=====check if long URL exists and show its details======
+        let longUrlData = await caching.GET_ASYNC(longUrl);
+        let cachedUrl = JSON.parse(longUrlData);
+        if (cachedUrl) {
+            return res.status(200).send({ status: true, data: cachedUrl });
+        }
+
         const findUrlDetails = await urlModel.findOne({ longUrl: longUrl }).select({ longUrl: 1, shortUrl: 1, urlCode: 1, _id: 0 });
         if (findUrlDetails) {
+            let a = await caching.SETEX_ASYNC(longUrl, 86400, JSON.stringify(findUrlDetails));
             return res.status(200).send({ status: true, data: findUrlDetails });
         }
 
@@ -64,14 +82,19 @@ const getUrl = async function (req, res) {
             return res.status(400).send({ status: false, message: "Please enter a valid URL code." });
         }
 
-        //======fetch the details based on the URL code======
+        let cachedUrlCode = await caching.GET_ASYNC(urlCode);
+        let getCachedUrlCode = JSON.parse(cachedUrlCode);
+        if (getCachedUrlCode) {
+            return res.status(302).redirect(getCachedUrlCode);
+        }
+
         let checkUrlCode = await urlModel.findOne({ urlCode: urlCode });
         if (!checkUrlCode) {
             return res.status(404).send({ status: false, message: "No URL found with this URL code." });
+        } else {
+            await caching.SETEX_ASYNC(urlCode, 86400, JSON.stringify(checkUrlCode.longUrl));
+            return res.status(302).redirect(checkUrlCode.longUrl);
         }
-
-        //=====redirecting to the Long URL based on the URL code=====
-        res.status(302).redirect(checkUrlCode.longUrl);
 
     } catch (err) {
         return res.status(500).send({ status: false, message: err.message });
