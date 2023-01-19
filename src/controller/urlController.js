@@ -33,7 +33,7 @@ const createShortUrl = async function (req, res) {
             return res.status(400).send({ status: false, message: "Please enter a valid URL." });
         }
 
-        //=====check if long URL exists and show its details======
+        //=====check if long URL exists and show its details from cached memory======
         let longUrlData = await caching.GET_ASYNC(longUrl);
         let cachedUrl = JSON.parse(longUrlData);
         if (cachedUrl) {
@@ -42,7 +42,7 @@ const createShortUrl = async function (req, res) {
 
         const findUrlDetails = await urlModel.findOne({ longUrl: longUrl }).select({ longUrl: 1, shortUrl: 1, urlCode: 1, _id: 0 });
         if (findUrlDetails) {
-            let a = await caching.SETEX_ASYNC(longUrl, 86400, JSON.stringify(findUrlDetails));
+            await caching.SETEX_ASYNC(longUrl, 86400, JSON.stringify(findUrlDetails));
             return res.status(200).send({ status: true, data: findUrlDetails });
         }
 
@@ -57,6 +57,7 @@ const createShortUrl = async function (req, res) {
         const createUrlData = await urlModel.create(data);
 
         const finalResult = await urlModel.findById(createUrlData._id).select({ longUrl: 1, shortUrl: 1, urlCode: 1, _id: 0 });
+        await caching.SETEX_ASYNC(longUrl, 86400, JSON.stringify(finalResult));
 
         res.status(201).send({ status: true, data: finalResult });
     } catch (err) {
