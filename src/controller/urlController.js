@@ -37,21 +37,21 @@ const createShortUrl = async function (req, res) {
         let longUrlData = await caching.GET_ASYNC(longUrl);
         let cachedUrl = JSON.parse(longUrlData);
         if (cachedUrl) {
-            return res.status(200).send({ status: true, data: cachedUrl });
+            return res.status(200).send({ status: true, msg: "Data Fetching From Cache", data: cachedUrl });
         }
 
         const findUrlDetails = await urlModel.findOne({ longUrl: longUrl }).select({ longUrl: 1, shortUrl: 1, urlCode: 1, _id: 0 });
         if (findUrlDetails) {
             await caching.SETEX_ASYNC(longUrl, 86400, JSON.stringify(findUrlDetails));
-            return res.status(200).send({ status: true, data: findUrlDetails });
+            return res.status(200).send({ status: true, msg: "Data Fetching From DB", data: findUrlDetails });
         }
 
         //====if long url is unique then generate URL code and short URL=====
         let uniqueUrlCode = ShortId.generate();
-        data.urlCode = uniqueUrlCode;
+        data.urlCode = uniqueUrlCode.toLowerCase();
 
-        let shortUrl = "http://localhost:3000/" + uniqueUrlCode;
-        data.shortUrl = shortUrl.toLowerCase();
+        let shortUrl = `${req.protocol}://${req.headers.host}/` + uniqueUrlCode;
+        data.shortUrl = shortUrl;
 
         //====here we are creating tha data=====
         const createUrlData = await urlModel.create(data);
@@ -83,6 +83,7 @@ const getUrl = async function (req, res) {
             return res.status(400).send({ status: false, message: "Please enter a valid URL code." });
         }
 
+        //===if URL code is valid then show the data from cache memory=====
         let cachedUrlCode = await caching.GET_ASYNC(urlCode);
         let getCachedUrlCode = JSON.parse(cachedUrlCode);
         if (getCachedUrlCode) {
