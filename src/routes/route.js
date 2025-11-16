@@ -2,6 +2,10 @@ const express = require("express");
 const router = express.Router();
 const urlController = require("../controller/urlController");
 
+router.get("/", function (req, res) {
+    res.status(200).send("Server is up and running.");
+});
+
 router.post("/url/shorten" , urlController.createShortUrl);
 router.get("/:urlCode" , urlController.getUrl);
 
