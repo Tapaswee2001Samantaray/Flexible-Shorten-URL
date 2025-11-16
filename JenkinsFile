@@ -1,10 +1,23 @@
 pipeline {
     agent any
 
+    tools {
+        nodejs 'node18'
+    }
+
+    environment {
+        SONAR_HOME = tool 'sonar-scanner'
+        PROJECT_ID = 'url-shortener-475637'
+        REGION = 'asia-south1'
+        IMAGE = "${REGION}-docker.pkg.dev/${PROJECT_ID}/node-urlshortener/urlshortener:latest"
+        GCS_BUCKET = "TRIVY_REPORTS"
+        GCS_KEY_CRED = "gcp-key"
+    }
+
     stages {
         stage('Checkout Code') {
             steps {
-                git branch: 'project/urlShortnerGroup13'. credentialsId: 'git-cred', url: 'https://github.com/Tapaswee2001Samantaray/Flexible-Shorten-URL.git'
+                git branch: 'project/urlShortnerGroup13', credentialsId: 'git-cred', url: 'https://github.com/Tapaswee2001Samantaray/Flexible-Shorten-URL.git'
             }
         }
 
@@ -14,26 +27,113 @@ pipeline {
             }
         }
 
-        stage('Run Tests') {
+        stage('SonarQube Analysis') {
             steps {
-                sh 'npm test || echo "No tests configured yet"'
+                withSonarQubeEnv('sonar') {
+                    sh '''$SONAR_HOME/bin/sonar-scanner -Dsonar.projectkey=urlshortener -Dsonar.sources=. -Dsonar.host.url=http://SONAR_HOST:9000 -Dsonar.login=$SONAR_TOKEN'''
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                script {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+
+        stage('Trivy Scan') {
+            steps {
+                sh 'trivy fs --format table -o trivy-fs-report.html . || true'
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                sh 'docker build -t gcp-node-urlshortener:latest .'
+                sh 'docker build -t $IMAGE .'
+            }
+        }
+
+        stage('Image Vulnerability Scan') {
+            steps {
+                sh 'trivy image --format table -o trivy-image-report.html $IMAGE || true'
+            }
+        }
+
+        stage('Push to Artifact Registry') {
+            steps {
+                withCredentials([file(credentialsId: "${GCS_KEY_CRED}", variable: 'GCP_KEY')]) {
+                    sh '''
+                        gcloud auth activate-service-account --key-file=$GCP_key
+                        gcloud auth configure-docker --quiet ${REGION}-docker.pkg.dev
+                        docker push $IMAGE
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy to GKE') {
+            steps {
+                // withKubeConfig([credentialsId: 'gcp-key', serverUrl: '', contextName: '', clusterName: 'devops-cluster', namespace: 'default']) {
+                //     sh 'kubeclt apply -f deployment-service.yaml'
+                // }
+                withCredentials([file(credentialsId: "${GCS_KEY_CRED}", variable: 'GCP_KEY')]) {
+                    sh '''
+                        gcloud auth activate-service-account --key-file=$GCP_KEY
+                        gcloud container clusters get-credentials devops-cluster --region ${REGION} --project ${PROJECT_ID}
+                        kubectl apply -f deployment-service.yaml
+                    '''
+                }
+            }
+        }
+
+        stage('Verify Deployment') {
+            steps {
+                sh 'kubectl get pods'
+                sh 'kubectl get svc'
+            }
+        }
+
+        stage('Upload Reports to GCS') {
+            steps {
+                withCredentials([file(credentialsId: "${GCS_KEY_CRED}", variable: 'GCP_KEY')]) {
+                    sh '''
+                        # activate service account
+                        gcloud auth activate-service-account --key-file=$GCP_KEY
+                        
+                        # ensure gsutil is available and configured for this project
+                        gcloud config set project ${PROJECT_ID}
+
+                        # create a folder for this build run
+                        TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+                        DEST_PATH="gs://${GCS_BUCKET}/builds/${JOB_NAME}/${BUILD_NUMBER}-${TIMESTAMP}/"
+
+                        echo "Uploading reports to ${DEST_PATH}"
+
+                        # upload files if they exist
+                        if [ -f trivy-fs-report.html ]; then gsutil cp trivy-fs-report.html ${DEST_PATH}; fi
+                        if [ -f trivy-image-report.html ]; then gsutil cp trivy-image-report.html ${DEST_PATH}; fi
+
+                        # If Sonar generated a report file or you exported scanner report, upload it too
+                        # Example: sonar-report.json (if you produce one)
+                        if [ -f sonar-report.json ]; then gsutil cp sonar-report.json ${DEST_PATH}; fi
+                    '''
+                }
             }
         }
     }
 
     post {
-        success {
-            echo "Build completed successfully!"
-        }
-
-        failure {
-            echo "❌ Build failed! Check logs."
+        always {
+            emailext (
+                subject: "Build #${BUILD_NUMBER} - ${currentBuild.result}",
+                to: 'tapas10231@gmail.com',
+                body: """<h3>Pipeline Status: ${currentBuild.result}</h3>
+                        <p>Reports (if any) uploaded to: gs://${GCS_BUCKET}/builds/${JOB_NAME}/${BUILD_NUMBER}-*</p>
+                        <p>Console: <a href="${BUILD_URL}">${BUILD_URL}</a></p>""",
+                mimeType: 'text/html'
+            )
         }
     }
 }
