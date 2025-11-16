@@ -2,10 +2,18 @@
   "name": "src",
   "version": "1.0.0",
   "description": "URL Shortner",
-  "main": "index.js",
+  "main": "src/index.js",
+  "engines": {
+    "node": "18.x"
+  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "start:dev": "nodemon src/index.js",
+    "test": "jest --coverage",
+    "lint": "eslint \"src/**/*.js\"",
+    "pretest": "npm run lint",
+    "build": "echo \"No build step required\"",
+    "prepare": "npm run lint"
   },
   "repository": {
     "type": "git",
@@ -25,5 +33,10 @@
     "shortid": "^2.2.16",
     "util": "^0.12.5",
     "valid-url": "^1.0.9"
+  },
+  "devDependencies": {
+    "eslint": "^8.50.0",
+    "jest": "^29.7.0",
+    "nodemon": "^2.0.22"
   }
 }
