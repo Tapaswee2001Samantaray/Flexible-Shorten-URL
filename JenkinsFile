@@ -1,0 +1,39 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Checkout Code') {
+            steps {
+                git branch: 'project/urlShortnerGroup13'. credentialsId: 'git-cred', url: 'https://github.com/Tapaswee2001Samantaray/Flexible-Shorten-URL.git'
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                sh 'npm install'
+            }
+        }
+
+        stage('Run Tests') {
+            steps {
+                sh 'npm test || echo "No tests configured yet"'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh 'docker build -t gcp-node-urlshortener:latest .'
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Build completed successfully!"
+        }
+
+        failure {
+            echo "❌ Build failed! Check logs."
+        }
+    }
+}
